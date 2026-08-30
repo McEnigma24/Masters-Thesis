@@ -1,0 +1,11 @@
+# Sionna 2.x (PyTorch) — PHY bez ray tracing
+sionna-no-rt>=1.2.0
+
+# PyTorch — zainstaluj osobno z https://pytorch.org (CUDA jeśli masz GPU)
+torch>=2.4.0
+
+# Notebooki i wizualizacja
+jupyter>=1.0.0
+ipykernel>=6.29.0
+matplotlib>=3.8.0
+numpy>=1.26.0

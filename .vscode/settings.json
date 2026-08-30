@@ -1,0 +1,6 @@
+{
+  "jupyter.jupyterServerType": "remote",
+  "jupyter.remote.jupyterServerUrl": "http://127.0.0.1:8888",
+  "remote.autoForwardPorts": true,
+  "remote.autoForwardPortsSource": "hybrid"
+}

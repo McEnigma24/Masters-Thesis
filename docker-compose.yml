@@ -1,0 +1,40 @@
+# Dev-container: mount całego repo, GPU NVIDIA, venv w ./.venv (uv)
+#
+#   docker compose build
+#   ./scripts/drun sync          # uv sync (pierwszy raz + po zmianie deps)
+#   ./scripts/drun run python …  # uv run …
+#   ./scripts/dsh                # shell w kontenerze
+
+name: magisterka
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: magisterka-sionna:dev
+
+    volumes:
+      # Cały projekt — nic nie kopiujemy do obrazu
+      - .:/workspace
+      # Cache UV poza bind-mount (szybsze re-sync)
+      - uv-cache:/root/.cache/uv
+
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      TZ: Europe/Warsaw
+
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+      - "${TENSORBOARD_PORT:-6006}:6006"
+
+    entrypoint: ["/workspace/docker/entrypoint.sh"]
+    command: ["bash"]
+
+volumes:
+  uv-cache:

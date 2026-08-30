@@ -1,0 +1,46 @@
+[project]
+name = "magisterka-neural-receiver"
+version = "0.1.0"
+description = "Sionna PHY — lekcje + Neural Receiver (praca magisterska)"
+readme = "neural-receiver/README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "sionna-no-rt>=2.0.1",
+    "torch>=2.9.1",
+    "tqdm>=4.67.0",
+    "tensorboard>=2.19.0",
+]
+
+[dependency-groups]
+jupyter = [
+    "jupyterlab>=4.3.0",
+    "ipykernel>=6.29.0",
+    "ipython>=8.30.0",
+    "notebook>=7.3.0",
+]
+experiments = [
+    "onnx>=1.17.0",
+    "onnxruntime-gpu>=1.20.0",
+    "thop>=0.1.1",
+    "pandas>=2.2.0",
+    "seaborn>=0.13.0",
+]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+]
+
+[tool.uv]
+default-groups = ["jupyter", "experiments"]
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu129" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

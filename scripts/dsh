@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+COMPOSE=(docker compose -f docker-compose.yml)
+if docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia; then
+  COMPOSE+=(-f docker-compose.gpu.yml)
+fi
+exec "${COMPOSE[@]}" run --rm --service-ports dev bash

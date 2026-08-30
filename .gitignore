@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# eksperymenty
+neural-receiver/experiments/*.npy
+neural-receiver/experiments/*.pt
+neural-receiver/experiments/*.pth
+
+# logi
+*.log
+runs/
+checkpoints/

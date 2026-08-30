@@ -1,0 +1,37 @@
+{
+  "name": "Magisterka — Sionna / Neural Receiver",
+  "dockerComposeFile": ["../docker-compose.yml", "../docker-compose.gpu.yml"],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/workspace/.venv/bin/python",
+        "python.terminal.activateEnvironment": false,
+        "notebook.defaultKernel": {
+          "id": "magisterka-sionna",
+          "kind": "jupyterKernel"
+        },
+        "jupyter.kernels.trusted": ["magisterka-sionna"],
+        "jupyter.jupyterServerType": "local"
+      }
+    }
+  },
+  "postCreateCommand": "uv sync && uv run python -m ipykernel install --sys-prefix --name magisterka-sionna --display-name 'Magisterka Sionna (CUDA / Docker)'",
+  "remoteUser": "root",
+  "forwardPorts": [8888, 6006],
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter Lab",
+      "onAutoForward": "notify"
+    },
+    "6006": {
+      "label": "TensorBoard",
+      "onAutoForward": "silent"
+    }
+  }
+}
