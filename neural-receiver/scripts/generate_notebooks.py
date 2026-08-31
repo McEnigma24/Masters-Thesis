@@ -326,6 +326,10 @@ num_bits = num_data_symbols * NUM_BITS_PER_SYMBOL
 
 bits = sn.phy.mapping.BinarySource()([batch_size, num_bits])
 symbols = mapper(bits)
+print("Shape symbols (Mapper):", symbols.shape)  # [batch, num_data_RE]
+
+# ResourceGridMapper oczekuje [batch, num_tx, num_streams, num_data_RE]
+symbols = symbols.reshape(batch_size, 1, 1, num_data_symbols)
 x_rg = rg_mapper(symbols)
 
 print("Shape grid TX:", x_rg.shape)
@@ -440,7 +444,8 @@ print("Średnie |y| vs |x|:", torch.abs(y_fade).mean().item(), torch.abs(x).mean
             md("## Etap 3 — Frequency selective (OFDM + TDL)"),
             code(
                 """from sionna.phy.ofdm import ResourceGrid, ResourceGridMapper, OFDMModulator, OFDMDemodulator
-from sionna.phy.channel import TDL
+from sionna.phy.channel import OFDMChannel
+from sionna.phy.channel.tr38901 import TDL
 
 rg = ResourceGrid(
     num_ofdm_symbols=14,
@@ -460,7 +465,7 @@ tdl = TDL(model="A", delay_spread=30e-9, carrier_frequency=3.5e9, min_speed=0.0)
 NUM_BPS = 2
 mapper_q = sn.phy.mapping.Mapper(constellation=sn.phy.mapping.Constellation("qam", NUM_BPS))
 bits_ofdm = sn.phy.mapping.BinarySource()([8, rg.num_data_symbols * NUM_BPS])
-sym = mapper_q(bits_ofdm)
+sym = mapper_q(bits_ofdm).reshape(8, 1, 1, rg.num_data_symbols)
 x_grid = rg_mapper(sym)
 x_time = modulator(x_grid)
 
@@ -697,7 +702,8 @@ SNR = 5 dB → Classical BLER = 0.08, Neural BLER = 0.04  ✓
     LSChannelEstimator,
     LMMSEEqualizer,
 )
-from sionna.phy.channel import TDL, OFDMChannel
+from sionna.phy.channel import OFDMChannel
+from sionna.phy.channel.tr38901 import TDL
 from sionna.phy.mimo import StreamManagement
 
 # Parametry linku
