@@ -1,0 +1,102 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+
+% Konfiguracja linków
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+\title{\vspace{-2cm}\textbf{Raport Wstępny z Badań i Plan Realizacji Pracy Magisterskiej}}
+\author{Temat: Zastosowanie algorytmów uczenia maszynowego do optymalizacji\\ warstwy fizycznej i mechanizmów adaptacji łącza w sieciach 5G/6G}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Cel Dokumentu}
+Niniejszy dokument stanowi podsumowanie wstępnych badań literaturowych oraz weryfikacji technologicznej dotyczącej możliwości zastosowania algorytmów sztucznej inteligencji (AI) w telekomunikacji. Głównym celem raportu jest przedstawienie promotorowi mierzalnego planu realizacji pracy dyplomowej, zdefiniowanie obszarów badawczych oraz wybór odpowiednich narzędzi, takich jak środowisko NVIDIA Sionna \cite{sionna-phy, sionna-sys, sionna-rt, sionna-rk} oraz OpenAirInterface \cite{oai}.
+
+\section{Analiza Stanu Wiedzy (State of the Art)}
+Tradycyjne metody przetwarzania sygnałów w sieciach komórkowych napotykają na ograniczenia w złożonych środowiskach propagacyjnych charakterystycznych dla sieci 5G/6G. W toku analizy literatury zidentyfikowano następujące obszary wdrożenia ML:
+
+\begin{itemize}
+    \item \textbf{Neural Receivers (Odbiorniki Neuronowe):} Modele ML realizujące wspólnie estymację, korekcję i demodulację sygnału. Literatura potwierdza skuteczność odbiorników neuronowych z uwzględnieniem rygorystycznych opóźnień (czas inferencji rzędu ułamków milisekund), m.in. dla 5G NR \cite{arxiv-2409-02912}.
+    \item \textbf{CSI Compression \& Prediction:} Wykorzystanie sieci neuronowych (autoenkoderów, Transformerów) do kompresji macierzy kanału radiowego (CSI) \cite{arxiv-2206-14383, ieee-9417115} i przewidywania ewolucji kanału \cite{arxiv-2409-13494}. Praktyczne aspekty takich rozwiązań badane są m.in. przez ośrodki Samsung Research \cite{samsung-csi} oraz środowiska symulacyjne MATLAB \cite{mathworks-csi}.
+    \item \textbf{Link Adaptation (MCS):} Ulepszone algorytmy doboru schematu modulacji i kodowania wspierane modelami predykcyjnymi \cite{arxiv-2603-00689, acm-mcs}.
+    \item \textbf{MAC Scheduling \& O-RAN:} Zastosowanie uczenia ze wzmocnieniem (DRL - Deep Reinforcement Learning) oraz aplikacji zintegrowanych z platformami O-RAN (dApps/xApps) do inteligentnego harmonogramowania zasobów radiowych i optymalizacji QoS \cite{rg-lte-drl, rg-oran-mac, rg-leasch, rg-actor-critic, rg-dapps, arxiv-2509-07242}.
+\end{itemize}
+
+\section{Architektury ML i Optymalizacja Sprzętowa (Hardware-Aware ML)}
+Praktyczne wdrażanie systemów AI w warstwie fizycznej (PHY) i MAC wymaga Hardware-Aware ML. Narzędzia badawcze takie jak platforma NVIDIA Sionna Research Kit \cite{youtube-sionna} udowodniły możliwość stosowania wnioskowania w czasie rzeczywistym. W ramach pracy badane będą:
+\begin{itemize}
+    \item Przeszukiwanie przestrzeni architektur (NAS) z ograniczeniami czasowymi.
+    \item Kompresja, przycinanie sieci (Pruning) oraz kwantyzacja (np. INT8).
+    \item Konwersja modeli do ONNX i wdrażanie akceleracji (NVIDIA TensorRT).
+\end{itemize}
+
+\section{Plan Realizacji Badań}
+Realizacja pracy dyplomowej została podzielona na cztery fazy:
+
+\begin{enumerate}[label=\textbf{Faza \arabic*:}, leftmargin=*]
+    \item \textbf{Środowisko badawcze i dane (NVIDIA Sionna)}\\
+    Budowa potoku w środowisku \textit{NVIDIA Sionna PHY/SYS/RT} \cite{sionna-phy, sionna-sys, sionna-rt} celem generacji datasetów i bazowego treningu architektur predykcyjnych.
+    
+    \item \textbf{Analiza eksperymentalna (Ablation Study)}\\
+    Ewaluacja kompromisu między narzutem na kompresję/predykcję CSI a wydajnością adaptacji łącza na poziomie systemu.
+    
+    \item \textbf{Optymalizacja czasu rzeczywistego (Real-Time)}\\
+    Kwantyzacja wytrenowanych sieci do precyzji ograniczającej opóźnienia i wykorzystanie bibliotek akceleracji celem wdrożenia.
+    
+    \item \textbf{Weryfikacja systemowa (Proof of Concept)}\\
+    Eksploracja integracji modeli (jako modułów inteligentnego harmonogramowania) ze stosem \textit{OpenAirInterface} \cite{oai}, czerpiąc z paradygmatów O-RAN (np. xApp/dApp) \cite{rg-dapps}.
+\end{enumerate}
+
+\newpage
+\begin{thebibliography}{99}
+
+% Narzędzia NVIDIA i OAI
+\bibitem{youtube-sionna} NVIDIA Developer, \textit{From Theory to Practice—Prototyping 6G With the NVIDIA Sionna Research Kit}, YouTube, 2026. [Online]. Dostępne: \url{https://www.youtube.com/watch?v=8OH8m5hyC90}
+\bibitem{sionna-phy} NVIDIA, \textit{Sionna PHY Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/phy/index.html}
+\bibitem{sionna-sys} NVIDIA, \textit{Sionna SYS Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/sys/index.html}
+\bibitem{sionna-rt} NVIDIA, \textit{Sionna RT Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/rt/index.html}
+\bibitem{sionna-rk} NVIDIA, \textit{Sionna Research Kit Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/rk/index.html}
+\bibitem{oai} OpenAirInterface Software Alliance, \textit{OpenAirInterface 5G}. [Online]. Dostępne: \url{https://openairinterface.org/}
+
+% Neural Receivers & O-RAN general
+\bibitem{arxiv-2409-02912} R. Wiesmayr et al., \textit{Design of a Standard-Compliant Real-Time Neural Receiver for 5G NR}, arXiv:2409.02912. [Online]. Dostępne: \url{https://arxiv.org/pdf/2409.02912}
+
+% CSI Compression
+\bibitem{arxiv-2206-14383} W. Chen et al., \textit{CSI Compression and Feedback Techniques}, arXiv:2206.14383. [Online]. Dostępne: \url{https://arxiv.org/pdf/2206.14383}
+\bibitem{samsung-csi} Samsung Research, \textit{Deep Learning for CSI Feedback: One-Sided Model and Joint Multi-Module Learning Perspectives}. [Online]. Dostępne: \url{https://research.samsung.com/blog/Deep-Learning-for-CSI-Feedback-One-Sided-Model-and-Joint-Multi-Module-Learning-Perspectives}
+\bibitem{ieee-9417115} IEEE, \textit{Deep Learning-Based CSI Feedback Approach}, Document ID: 9417115. [Online]. Dostępne: \url{https://ieeexplore.ieee.org/document/9417115}
+\bibitem{mathworks-csi} MathWorks, \textit{CSI Feedback Using Autoencoders and Transformers}. [Online]. Dostępne: \url{https://www.mathworks.com/help/5g/ug/csi-feedback-transformer-autoencoder.html}
+\bibitem{arxiv-2409-13494} arXiv, \textit{CSI Prediction and Estimation via Deep Learning}, arXiv:2409.13494. [Online]. Dostępne: \url{https://arxiv.org/pdf/2409.13494}
+
+% MCS
+\bibitem{arxiv-2603-00689} arXiv, \textit{Machine Learning for MCS Selection}, arXiv:2603.00689. [Online]. Dostępne: \url{https://arxiv.org/pdf/2603.00689}
+\bibitem{acm-mcs} ACM Digital Library, \textit{Data-Driven Link Adaptation}, DOI: 10.1145/3341216.3342212. [Online]. Dostępne: \url{https://dl.acm.org/doi/epdf/10.1145/3341216.3342212}
+
+% MAC Scheduler
+\bibitem{rg-lte-drl} ResearchGate, \textit{Downlink Scheduling in LTE with Deep Reinforcement Learning (LSTMs and Pointers)}. [Online]. Dostępne: \url{https://www.researchgate.net/publication/357438566_Downlink_Scheduling_in_LTE_with_Deep_Reinforcement_Learning_LSTMs_and_Pointers}
+\bibitem{rg-oran-mac} ResearchGate, \textit{Dynamic MAC Scheduling in O-RAN using Federated Deep Reinforcement Learning}. [Online]. Dostępne: \url{https://www.researchgate.net/publication/373317815_Dynamic_MAC_Scheduling_in_O-RAN_using_Federated_Deep_Reinforcement_Learning}
+\bibitem{rg-leasch} ResearchGate, \textit{Learn to Schedule LEASCH: A Deep reinforcement learning approach for radio resource scheduling in the 5G MAC layer}. [Online]. Dostępne: \url{https://www.researchgate.net/publication/340134855_Learn_to_Schedule_LEASCH_A_Deep_reinforcement_learning_approach_for_radio_resource_scheduling_in_the_5G_MAC_layer}
+\bibitem{rg-actor-critic} ResearchGate, \textit{Actor-Critic Learning Based QoS-Aware Scheduler for Reconfigurable Wireless Networks}. [Online]. Dostępne: \url{https://www.researchgate.net/publication/348958289_Actor-Critic_Learning_Based_QoS-Aware_Scheduler_for_Reconfigurable_Wireless_Networks}
+\bibitem{arxiv-2509-07242} arXiv, \textit{AI-Based MAC Scheduling}, arXiv:2509.07242. [Online]. Dostępne: \url{https://arxiv.org/pdf/2509.07242}
+\bibitem{rg-dapps} ResearchGate, \textit{dApps: Distributed Applications for Real-time Inference and Control in O-RAN}. [Online]. Dostępne: \url{https://www.researchgate.net/publication/362503033_dApps_Distributed_Applications_for_Real-time_Inference_and_Control_in_O-RAN}
+
+\end{thebibliography}
+
+\end{document}
