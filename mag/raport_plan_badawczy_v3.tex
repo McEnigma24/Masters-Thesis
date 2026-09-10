@@ -49,13 +49,13 @@
 
 \begin{abstract}
 \noindent
-Niniejszy raport przedstawia stan wiedzy, przegląd przeanalizowanych materiałów oraz szczegółowy plan realizacji pracy magisterskiej dotyczącej zastosowania uczenia maszynowego w warstwie fizycznej (PHY) i mechanizmach adaptacji łącza sieci 5G/6G. Zakres obejmuje odbiorniki neuronowe, kompresję i predykcję CSI, adaptację łącza (MCS) oraz optymalizację sprzętową modeli (kwantyzacja, pruning, destylacja, NAS). Poza zakresem pozostaje harmonogramowanie zasobów radiowych w warstwie MAC. Badania będą prowadzone w środowisku NVIDIA Sionna (PHY i SYS) z docelową integracją wybranych modeli ze stosem OpenAirInterface poprzez eksport ONNX. Raport definiuje pytania badawcze, hipotezy oraz metodykę eksperymentalną.
+Niniejszy raport przedstawia stan wiedzy, przegląd przeanalizowanych materiałów oraz szczegółowy plan realizacji pracy magisterskiej dotyczącej zastosowania uczenia maszynowego w warstwie fizycznej (PHY) i mechanizmach adaptacji łącza sieci 5G/6G. Zakres obejmuje odbiorniki neuronowe, kompresję i predykcję CSI, adaptację łącza (MCS) oraz optymalizację sprzętową modeli (kwantyzacja, pruning, destylacja, NAS). Badania będą prowadzone w środowisku NVIDIA Sionna (PHY i SYS) z docelową integracją wybranych modeli ze stosem OpenAirInterface poprzez eksport ONNX. Raport definiuje pytania badawcze, hipotezy oraz metodykę eksperymentalną.
 \end{abstract}
 
 \begin{otherlanguage*}{english}
 \begin{abstract}
 \noindent
-This report summarizes the state of the art, annotated literature review, and detailed research plan for a master's thesis on machine learning for 5G/6G physical-layer optimization and link adaptation. The scope covers neural receivers, CSI compression and prediction, MCS selection, and hardware-aware model optimization. MAC-layer radio resource scheduling is explicitly out of scope. Experiments will be conducted in NVIDIA Sionna (PHY and SYS) with planned integration of selected models into the OpenAirInterface stack via ONNX export. The document defines research questions, hypotheses, and experimental methodology.
+This report summarizes the state of the art, annotated literature review, and detailed research plan for a master's thesis on machine learning for 5G/6G physical-layer optimization and link adaptation. The scope covers neural receivers, CSI compression and prediction, MCS selection, and hardware-aware model optimization. Experiments will be conducted in NVIDIA Sionna (PHY and SYS) with planned integration of selected models into the OpenAirInterface stack via ONNX export. The document defines research questions, hypotheses, and experimental methodology.
 \end{abstract}
 \end{otherlanguage*}
 
@@ -76,7 +76,7 @@ Niniejszy dokument stanowi raport wstępny z badań i plan realizacji pracy magi
     \item szczegółowy opis metodyki realizacji, w tym integracji modeli ONNX z OpenAirInterface.
 \end{itemize}
 
-\textbf{Zakres pracy} obejmuje optymalizację międzywarstwową (cross-layer) na pograniczu PHY i adaptacji łącza: modele ML zastępujące lub wspierające klasyczne bloki odbiornika, kompresję/predykcję CSI oraz decyzje o MCS. \textbf{Poza zakresem} pozostają: harmonogramowanie zasobów radiowych i sterowanie MAC (w tym DRL scheduling, xApp/rApp O-RAN), pełna implementacja stosu core network 5G, badania nad warstwą aplikacji, trening modeli od zera dla pełnego MU-MIMO z dziesiątkami użytkowników oraz wdrożenie produkcyjne na sprzęcie komercyjnym poza środowiskiem badawczym (OAI + GPU).
+\textbf{Zakres pracy} obejmuje optymalizację międzywarstwową (cross-layer) na pograniczu PHY i adaptacji łącza: modele ML zastępujące lub wspierające klasyczne bloki odbiornika, kompresję/predykcję CSI oraz decyzje o MCS. \textbf{Poza zakresem} pozostają: pełna implementacja stosu core network 5G, badania nad warstwą aplikacji, trening modeli od zera dla pełnego MU-MIMO z dziesiątkami użytkowników oraz wdrożenie produkcyjne na sprzęcie komercyjnym poza środowiskiem badawczym (OAI + GPU).
 
 %==============================================================================
 \section{Motywacja i kontekst technologiczny}
@@ -366,7 +366,7 @@ Badania zorganizowane są warstwowo: każdy kolejny moduł rozszerza poprzedni, 
 
 \textbf{Sionna PHY} (wersja 2.x, PyTorch 2.9+, Python 3.11+)~\cite{sionna-phy}: symulacja link-level 5G NR PUSCH/PDSCH z komponentami 3GPP (LDPC, mappery, resource grid, kanały TDL/CDL).
 
-\textbf{Sionna SYS}~\cite{sionna-sys}: symulacja system-level multi-cell z \texttt{PHYAbstraction}, \texttt{OuterLoopLinkAdaptation} i \texttt{InnerLoopLinkAdaptation} (wbudowany scheduler PF pełni wyłącznie rolę komponentu symulatora, nie jest przedmiotem badań).
+\textbf{Sionna SYS}~\cite{sionna-sys}: symulacja system-level multi-cell z \texttt{PHYAbstraction}, \texttt{OuterLoopLinkAdaptation} i \texttt{InnerLoopLinkAdaptation}.
 
 \textbf{Konfiguracja referencyjna NR:}
 \begin{itemize}[leftmargin=*]
@@ -439,7 +439,7 @@ Pipeline optymalizacji dla wybranych modeli z modułu A (priorytet) oraz B:
 \subsection{Integracja z OpenAirInterface przez ONNX}
 \label{sec:oai-onnx}
 
-Dwie ścieżki integracji ONNX z OAI --- obie w zakresie PHY i sprzężenia zwrotnego CSI, bez ingerencji w scheduler MAC:
+Rozważane są dwie ścieżki integracji modeli ONNX ze stosem OAI: odbiornik neuronowy w warstwie PHY oraz autoenkoder CSI w pętli sprzężenia zwrotnego.
 
 \subsubsection{Ścieżka A: Neural Receiver (główna)}
 
