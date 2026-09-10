@@ -1,0 +1,578 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+\newcommand{\bibentry}[4]{%
+    \textbf{#1}\\
+    \textit{#2}\\
+    #3\\
+    \vspace{0.3em}
+    #4
+    \vspace{0.8em}
+}
+
+\title{%
+    \vspace{-1.5cm}%
+    \textbf{Raport Wstępny z Badań i Plan Realizacji\\Pracy Magisterskiej}\\[0.8em]
+    \large Zastosowanie algorytmów uczenia maszynowego do optymalizacji\\warstwy fizycznej i mechanizmów adaptacji łącza w sieciach 5G/6G
+}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+Niniejszy raport przedstawia stan wiedzy, przegląd przeanalizowanych materiałów oraz szczegółowy plan realizacji pracy magisterskiej dotyczącej zastosowania uczenia maszynowego w warstwie fizycznej (PHY) i mechanizmach adaptacji łącza sieci 5G/6G. Zakres obejmuje odbiorniki neuronowe, kompresję i predykcję CSI, adaptację łącza (MCS) oraz optymalizację sprzętową modeli (kwantyzacja, pruning, destylacja, NAS). Poza zakresem pozostaje harmonogramowanie zasobów radiowych w warstwie MAC. Badania będą prowadzone w środowisku NVIDIA Sionna (PHY i SYS) z docelową integracją wybranych modeli ze stosem OpenAirInterface poprzez eksport ONNX. Raport definiuje pytania badawcze, hipotezy oraz metodykę eksperymentalną.
+\end{abstract}
+
+\begin{otherlanguage*}{english}
+\begin{abstract}
+\noindent
+This report summarizes the state of the art, annotated literature review, and detailed research plan for a master's thesis on machine learning for 5G/6G physical-layer optimization and link adaptation. The scope covers neural receivers, CSI compression and prediction, MCS selection, and hardware-aware model optimization. MAC-layer radio resource scheduling is explicitly out of scope. Experiments will be conducted in NVIDIA Sionna (PHY and SYS) with planned integration of selected models into the OpenAirInterface stack via ONNX export. The document defines research questions, hypotheses, and experimental methodology.
+\end{abstract}
+\end{otherlanguage*}
+
+\newpage
+\tableofcontents
+\newpage
+
+%==============================================================================
+\section{Cel i zakres dokumentu}
+%==============================================================================
+
+Niniejszy dokument stanowi raport wstępny z badań i plan realizacji pracy magisterskiej składany promotorowi. Jego cele są następujące:
+\begin{itemize}[leftmargin=*]
+    \item przedstawienie motywacji i kontekstu technologicznego (standaryzacja 3GPP, kierunek 6G, walidacja w OpenAirInterface);
+    \item sformułowanie problemu badawczego w postaci pytań badawczych (RQ) i hipotez weryfikowalnych eksperymentalnie;
+    \item synteza stanu wiedzy w obszarach: Neural Receivers, CSI feedback/prediction, Link Adaptation, Hardware-Aware ML;
+    \item anotowany przegląd materiałów z poprawionymi metadanymi bibliograficznymi;
+    \item szczegółowy opis metodyki realizacji, w tym integracji modeli ONNX z OpenAirInterface.
+\end{itemize}
+
+\textbf{Zakres pracy} obejmuje optymalizację międzywarstwową (cross-layer) na pograniczu PHY i adaptacji łącza: modele ML zastępujące lub wspierające klasyczne bloki odbiornika, kompresję/predykcję CSI oraz decyzje o MCS. \textbf{Poza zakresem} pozostają: harmonogramowanie zasobów radiowych i sterowanie MAC (w tym DRL scheduling, xApp/rApp O-RAN), pełna implementacja stosu core network 5G, badania nad warstwą aplikacji, trening modeli od zera dla pełnego MU-MIMO z dziesiątkami użytkowników oraz wdrożenie produkcyjne na sprzęcie komercyjnym poza środowiskiem badawczym (OAI + GPU).
+
+%==============================================================================
+\section{Motywacja i kontekst technologiczny}
+%==============================================================================
+
+Tradycyjne algorytmy przetwarzania sygnałów w sieciach komórkowych---estymacja kanału, equalizacja, demapowanie, zewnępętla adaptacji łącza (OLLA)---są dobrze zrozumiałe i znormalizowane, lecz napotykają ograniczenia w złożonych scenariuszach propagacyjnych charakterystycznych dla 5G NR i planowanych systemów 6G (wysokie częstotliwości, massive MIMO, mobilność, slicing). Równolegle sztuczna inteligencja przenika warstwę radiową nie tylko jako narzędzie badawcze, ale jako przedmiot standaryzacji.
+
+\subsection{Standaryzacja AI/ML w 3GPP}
+
+3GPP w ramach Release~18 rozpoczął studium \emph{Study on Artificial Intelligence (AI)/Machine Learning (ML) for NR air interface} (TR~38.843)~\cite{3gpp-38843}. Raport obejmuje ogólny framework AI/ML oraz przypadki użycia: kompresję CSI w domenie przestrzenno-częstotliwościowej (modele dwustronne), predykcję CSI w domenie czasu (modele po stronie UE), zarządzanie wiązkami (beam management) i pozycjonowanie. W Release~19 prace kontynuowane są w kierunku wymagań normatywnych, metryk monitorowania (SGCS, NMSE, throughput) oraz mechanizmów fallbacku~\cite{3gpp-38843,ieee-comsoc-r18-ai}.
+
+Kontekst standaryzacyjny uzasadnia badania nad kompresją CSI, predykcją kanału i odbiornikami neuronowymi nie jako modą technologiczną, lecz jako kierunkiem rozwoju interfejsu radiowego NR/6G.
+
+\subsection{Walidacja systemowa w OpenAirInterface}
+
+Wyniki uzyskane w symulatorze link-level (Sionna PHY) i system-level (Sionna SYS) wymagają walidacji poza środowiskiem czysto symulacyjnym. OpenAirInterface (OAI)~\cite{oai} stanowi open-source implementację stosu 5G RAN, w której możliwe jest wstrzyknięcie modeli ML po eksporcie do ONNX --- m.in. neural receiver w warstwie PHY~\cite{neural-rx-repo,sionna-rk} oraz autoenkoder CSI~\cite{cheng-oai-csi-2024}. Taka ścieżka pozwala zmierzyć latencję inferencji i jakość odbioru w konfiguracji zbliżonej do rzeczywistego gNB, bez konieczności badania harmonogramowania MAC.
+
+\subsection{Motywacja badawcza}
+
+Motywacją pracy jest dogłębne zrozumienie kompromisu między \emph{jakością odbioru}, \emph{zdolnością generalizacji} modeli ML oraz \emph{opóźnieniem inferencji} w kontekście wymagań 5G NR. Literatura pokazuje, że odbiorniki neuronowe mogą poprawiać BLER względem klasycznych łańcuchów~\cite{arxiv-2312-02601,arxiv-2409-02912}, lecz wdrożenie real-time wymaga świadomego projektowania architektury i optymalizacji sprzętowej (TensorRT, kwantyzacja)~\cite{arxiv-2409-02912,neural-rx-repo}. Jednocześnie jakość decyzji MCS zależy od dokładności i aktualności CSI~\cite{wen-csinet-2018,arxiv-2206-14383}, co uzasadnia badania cross-layer łączące moduły PHY i adaptację łącza w Sionna SYS~\cite{sionna-sys}.
+
+%==============================================================================
+\section{Sformułowanie problemu badawczego}
+%==============================================================================
+
+\subsection{Pytania badawcze}
+
+\begin{enumerate}[label=\textbf{RQ\arabic*:}, leftmargin=*]
+    \item Czy wybrane architektury neuronowe (CNN, Transformer, autoenkoder, sieć rekurencyjna) osiągają porównywalną lub lepszą jakość odbioru (BLER/BER) niż klasyczny odbiornik LS--LMMSE--demapper w symulacji link-level 5G NR (Sionna PHY)?
+    \item Jaki jest kompromis między liczbą parametrów, FLOPs, pamięcią GPU i latencją inferencji (p50/p99) dla porównywanych architektur przy zadanym budżecie czasu rzeczywistego ($T_{\mathrm{slot}}$ dla SCS = 30~kHz wynosi 0,5~ms)?
+    \item W jakim stopniu modele generalizują na niewidziane warunki kanału (CDL), SNR, prędkość UE i konfiguracje MCS?
+    \item Czy kompresja CSI (autoenkoder/transformer) redukuje narzut sprzężenia zwrotnego przy akceptowalnej degradacji NMSE/SGCS i jak wpływa na decyzje MCS w symulacji systemowej?
+    \item Czy predykcja CSI (LSTM/GRU/Transformer) ogranicza błąd predykcji kanału w scenariuszach z mobilnością i czy przekłada się to na wyższy goodput systemu?
+    \item Czy modele wyeksportowane do ONNX i uruchomione w OAI (ONNX Runtime / TensorRT) zachowują jakość i mieszczą się w budżecie latencji end-to-end względem symulacji offline?
+\end{enumerate}
+
+\subsection{Hipotezy}
+
+\begin{enumerate}[label=\textbf{H\arabic*:}, leftmargin=*]
+    \item \textbf{H1:} Kompaktowy CNN neural receiver osiągnie BLER nie gorszy niż klasyczny baseline przy SNR w zakresie treningu, z latencją inferencji znacząco niższą niż Transformer o porównywalnej liczbie parametrów.
+    \item \textbf{H2:} Kwantyzacja FP16 z minimalną degradacją BLER umożliwi redukcję latencji względem FP32; INT8 wymaga QAT, aby utrzymać jakość akceptowalną dla łącza.
+    \item \textbf{H3:} Integracja skompresowanej lub przewidywanej CSI poprawi skuteczność adaptacji łącza (throughput, śledzenie celu BLER) względem OLLA z idealnym CSI w co najmniej jednym scenariuszu z ograniczonym budżetem sprzężenia zwrotnego.
+    \item \textbf{H4:} Eksport ONNX i inferencja w OAI dla co najmniej jednego modułu (neural receiver lub autoenkoder CSI) jest wykonalna z latencją p99 poniżej ułamka czasu slotu przy konfiguracji referencyjnej (np. 24~PRB).
+\end{enumerate}
+
+%==============================================================================
+\section{Analiza stanu wiedzy}
+%==============================================================================
+
+\subsection{Odbiorniki neuronowe (Neural Receivers)}
+
+Koncepcja zastąpienia klasycznego łańcucha estymacja--equalizacja--demapowanie jednym modułem neuronowym produkującym LLR dla dekodera LDPC została zasygnalizowana już w pracy wprowadzającej deep learning do warstwy fizycznej~\cite{oshea-hoydis-2017}. W kontekście 5G NR NVIDIA i ETH zaproponowali architekturę CGNN dla MU-MIMO PUSCH~\cite{arxiv-2312-02601}, a następnie rozszerzyli ją o zgodność ze standardem, inferencję poniżej 1~ms na GPU A100 oraz adaptację do zmiennego MCS bez retreningu~\cite{arxiv-2409-02912}. Repozytorium \texttt{NVlabs/neural\_rx} i Sionna Research Kit udostępniają pipeline treningu, eksportu ONNX/TensorRT i integracji z OAI~\cite{neural-rx-repo,sionna-rk}.
+
+\subsection{Kompresja i predykcja CSI}
+
+Kompresja CSI oparta na autoenkoderach (CsiNet)~\cite{wen-csinet-2018} oraz przegląd metod DL dla massive MIMO~\cite{arxiv-2206-14383} pokazują redukcję narzutu sprzężenia zwrotnego przy zachowaniu jakości rekonstrukcji. Prace branżowe (Samsung) i tutorialowe (MathWorks) dokumentują modele jednostronne i wielomodułowe~\cite{samsung-csi,mathworks-csi}. Adaptacyjne ramy kompresji (MAMR)~\cite{ieee-9417115} oraz generalizacja między środowiskami (UniversalNet)~\cite{arxiv-2409-13494} adresują problem dopasowania modelu do nowych scenariuszy. Predykcja CSI (np. CSI-4CAST)~\cite{arxiv-2510-12996} łączy CNN, Transformery i bloki mobilne w hybrydach odpornych na szum i zmienność kanału.
+
+\subsection{Adaptacja łącza (Link Adaptation)}
+
+Klasyczne OLLA kompensuje niedokładność estymacji SINR na podstawie feedbacku HARQ. Uczenie maszynowe oferuje alternatywy: kontekstowe multi-armed bandits~\cite{acm-mcs} oraz deep reinforcement learning uwzględniający opóźnienia ACK/NACK i HARQ~\cite{arxiv-2603-00689}. Sionna SYS dostarcza gotowe moduły \texttt{InnerLoopLinkAdaptation} i \texttt{OuterLoopLinkAdaptation} jako punkt odniesienia~\cite{sionna-sys}.
+
+\subsection{Hardware-Aware ML}
+
+Wdrożenie AI w PHY wymaga kwantyzacji, pruning, destylacji i ewentualnie NAS z ograniczeniem latencji~\cite{arxiv-2409-02912,youtube-sionna}. Sionna Research Kit dokumentuje ścieżkę PyTorch $\rightarrow$ ONNX $\rightarrow$ TensorRT z kernelami CUDA na pre/post-processing~\cite{sionna-rk,neural-rx-repo}.
+
+\subsection{Zidentyfikowana luka badawcza}
+
+Literatura koncentruje się często na pojedynczym module (odbiornik \emph{albo} CSI feedback \emph{albo} adaptacja łącza) oraz na metrykach offline (BLER, NMSE). Brakuje spójnych badań cross-layer w jednolitym środowisku (Sionna PHY + SYS) z walidacją wdrożeniową w OAI przez ONNX, obejmujących jednocześnie kompromis jakość--latencja--generalizacja. Niniejsza praca ma wypełnić tę lukę w zakresie zdefiniowanym w~sekcji~\ref{sec:metodyka}.
+
+%==============================================================================
+\section{Przegląd materiałów}
+%==============================================================================
+
+Poniżej przedstawiono anotowany przegląd źródeł. Dla każdej pozycji podano poprawne metadane, streszczenie, kluczowe wyniki oraz wnioski dla realizacji pracy.
+
+\subsection{Grupa A: Odbiorniki neuronowe}
+
+\bibentry{%
+    T.~O'Shea, J.~Hoydis (2017)}%
+    {An Introduction to Deep Learning for the Physical Layer}%
+    {IEEE Transactions on Cognitive Communications and Networking, vol.~3, no.~4, pp.~563--575, 2017.}%
+    {Praca wprowadza koncepcję end-to-end uczenia głębokiego w warstwie fizycznej, zastępując klasyczne bloki odbiornika sieciami neuronowymi. Autorzy pokazują, że autoenkodery i sieci konwolucyjne mogą realizować demapowanie i korekcję błędów w jednym module.}%
+    \textbf{Kluczowe wyniki:} poprawa BER względem klasycznych metod w wybranych scenariuszach AWGN i fading; fundament pod późniejsze prace nad neural receivers w 5G.\\
+    \textbf{Wnioski dla pracy:} uzasadnia modularność wyjścia LLR + klasyczny LDPC; stanowi punkt wyjścia koncepcyjny dla modułu A.
+
+\bibentry{%
+    S.~Cammerer \textit{et al.} (2023)}%
+    {A Neural Receiver for 5G NR Multi-user MIMO}%
+    {IEEE Globecom Workshops, 2023; arXiv:2312.02601.}%
+    {Autorzy proponują odbiornik MU-MIMO PUSCH zgodny z 5G NR oparty na CGNN, przetwarzający cały slot OFDM (estymacja, equalizacja, demapowanie łącznie). Architektura wspiera zmienną liczbę użytkowników i PRB bez retreningu.}%
+    \textbf{Kluczowe wyniki:} poprawa wydajności względem klasycznego odbiornika w symulacjach 3GPP; podkreślona uniwersalność względem liczby strumieni.\\
+    \textbf{Wnioski dla pracy:} wzorzec architektury hybrydowej CNN+GNN; punkt odniesienia dla wariantu zaawansowanego ponad prosty CNN.
+
+\bibentry{%
+    R.~Wiesmayr \textit{et al.} (2024)}%
+    {Design of a Standard-Compliant Real-Time Neural Receiver for 5G NR}%
+    {arXiv:2409.02912; NVIDIA Research / ETH Zurich.}%
+    {Praca opisuje wdrożenie MU-MIMO neural receiver w systemie zgodnym z 5G NR: optymalizacja latencji TensorRT, obsługa dynamicznego MCS bez dodatkowego kosztu inferencji, site-specific fine-tuning z modelami ray-tracing.}%
+    \textbf{Kluczowe wyniki:} inferencja $<$1~ms na NVIDIA A100; degradacja SNR $<$0,7~dB względem wersji nieoptymalizowanej pod real-time; gotowy kod TensorRT.\\
+    \textbf{Wnioski dla pracy:} bezpośredni benchmark latencji i ścieżka integracji OAI; cel dla eksperymentów E5--E7.
+
+\bibentry{%
+    NVlabs (2024--2026)}%
+    {neural\_rx -- Repository and Sionna RK Tutorial}%
+    {GitHub: NVlabs/neural\_rx; Sionna RK: 5G NR PUSCH Neural Receiver~\cite{sionna-rk}.}%
+    {Repozytorium zawiera pipeline treningu PUSCH, eksport ONNX (wersja onnx 1.14), budowę silnika TensorRT oraz plugin OAI \texttt{libreceiver\_neural\_rx.so}. Tutorial dokumentuje konfigurację 24~PRB i statystyki inferencji w logu gNB.}%
+    \textbf{Kluczowe wyniki:} end-to-end ścieżka od Sionna do OAI; pre/post-processing CUDA (float16 in, int16 LLR out).\\
+    \textbf{Wnioski dla pracy:} główna referencja implementacyjna dla sekcji~\ref{sec:oai-onnx}, ścieżka A.
+
+\subsection{Grupa B: Kompresja i predykcja CSI}
+
+\bibentry{%
+    C.-K.~Wen, W.-T.~Shih, S.~Jin (2018)}%
+    {Deep Learning for Massive MIMO CSI Feedback}%
+    {IEEE Wireless Communications Letters, vol.~7, no.~5, pp.~748--751, 2018 (CsiNet).}%
+    {Wprowadza autoenkoder do kompresji CSI w massive MIMO: enkoder po stronie UE, dekoder po stronie gNB, minimalizacja błędu rekonstrukcji przy ograniczonym payloadzie sprzężenia zwrotnego.}%
+    \textbf{Kluczowe wyniki:} znacząca redukcja bitów feedbacku przy porównywalnej jakości beamforming względem metod klasycznych.\\
+    \textbf{Wnioski dla pracy:} baseline architektury autoenkodera w module B; metryka NMSE.
+
+\bibentry{%
+    J.~Guo, C.-K.~Wen, S.~Jin, G.~Y.~Li (2022)}%
+    {Overview of Deep Learning-based CSI Feedback in Massive MIMO Systems}%
+    {arXiv:2206.14383.}%
+    {Przegląd metod DL dla CSI feedback: architektury autoenkoderów, wiedza ekspercka w projektowaniu sieci, kompresja bit-level, współprojektowanie z innymi modułami, kwestie generalizacji i standaryzacji.}%
+    \textbf{Kluczowe wyniki:} taksonomia podejść; identyfikacja wyzwań: zbieranie datasetu, trening online, złożoność.\\
+    \textbf{Wnioski dla pracy:} mapa literatury dla modułu B; uzasadnienie badań generalizacji (E4).
+
+\bibentry{%
+    Y.~Wang \textit{et al.} (2021)}%
+    {A Novel Compression CSI Feedback based on Deep Learning for FDD Massive MIMO Systems}%
+    {IEEE WCNC 2021, DOI: 10.1109/WCNC49053.2021.9417115.}%
+    {Proponuje framework MAMR (Modular Adaptive Multiple-Rate) z modułami padding umożliwiającymi jednemu autoenkoderowi obsługę zmiennych współczynników kompresji bez retreningu dla każdego scenariusza.}%
+    \textbf{Kluczowe wyniki:} poprawa NMSE względem CsiNet w testach FDD massive MIMO.\\
+    \textbf{Wnioski dla pracy:} inspiracja dla wariantu multi-rate w module B.
+
+\bibentry{%
+    Z.~Liu, Y.~Ma, R.~Tafazolli (2024/2025)}%
+    {Generalizing Deep Learning-Based CSI Feedback in Massive MIMO via ID-Photo-Inspired Preprocessing (UniversalNet)}%
+    {arXiv:2409.13494; IEEE WCNC 2025.}%
+    {UniversalNet standaryzuje format wejścia CSI (preprocessing inspirowany zdjęciem ID) bez zmiany wag sieci, poprawiając generalizację między środowiskami propagacyjnymi. Optymalizacja wektorów własnych zwiększa sparsyfikację macierzy precodingowej.}%
+    \textbf{Kluczowe wyniki:} lepsza generalizacja przy ograniczonej różnorodności treningu; kompatybilność z istniejącymi modelami feedbacku.\\
+    \textbf{Wnioski dla pracy:} metodyka testów generalizacji CSI (nie predykcja czasowa); preprocessing przed autoenkoderem.
+
+\bibentry{%
+    S.~Cheng \textit{et al.} (2025)}%
+    {CSI-4CAST: A Hybrid Deep Learning Model for CSI Prediction with Comprehensive Robustness and Generalization Testing}%
+    {arXiv:2510.12996.}%
+    {Hybryda CNN + Transformer + ShuffleNet + adaptive correction dla predykcji CSI; benchmark CSI-RRG ($>$300 scenariuszy TDD/FDD).}%
+    \textbf{Kluczowe wyniki:} wyższa dokładność predykcji i mniejsza złożoność (FLOPs) względem baseline'ów w większości scenariuszy testowych.\\
+    \textbf{Wnioski dla pracy:} referencja dla modułu C (predykcja); metryki i protokół testów robustness.
+
+\bibentry{%
+    Samsung Research}%
+    {Deep Learning for CSI Feedback: One-Sided Model and Joint Multi-Module Learning}%
+    {Blog badawczy Samsung, 2023.}%
+    {Opisuje modele jednostronne oraz współuczenie wielu modułów RAN z kompresją CSI w praktycznym wdrożeniu massive MIMO.
+    \textbf{Kluczowe wyniki:} redukcja overheadu feedbacku przy zachowaniu jakości transmisji w testach wewnętrznych.
+    \textbf{Wnioski dla pracy:} uzasadnienie cross-module learning w kontekście przemysłowym.}
+
+\bibentry{%
+    MathWorks}%
+    {CSI Feedback Using Autoencoders and Transformers}%
+    {Dokumentacja 5G Toolbox, 2024.}%
+    {Tutorial implementacji autoenkodera i transformera do CSI feedback w MATLAB, z metrykami NMSE i porównaniem do kodowania typu 2GPP.
+    \textbf{Kluczowe wyniki:} referencyjne implementacje i wykresy NMSE vs. compression ratio.
+    \textbf{Wnioski dla pracy:} punkt porównawczy implementacyjny (nie główne środowisko).}
+
+\bibentry{%
+    H.~Cheng \textit{et al.} (2024)}%
+    {Real-time AI-enabled CSI Feedback}%
+    {IEEE WONS 2024.}%
+    {Integracja autoenkodera CSI z OAI: enkoder w nrUE, dekoder w gNB, inferencja przez ONNX Runtime C API na CPU x86 ($\sim$18~MB).}%
+    \textbf{Kluczowe wyniki:} wykonalność real-time CSI feedback w end-to-end sieci OAI + SDR.\\
+    \textbf{Wnioski dla pracy:} bezpośredni wzorzec ścieżki B integracji ONNX z OAI.
+
+\subsection{Grupa C: Adaptacja łącza}
+
+\bibentry{%
+    V.~Saxena \textit{et al.} (2019)}%
+    {Contextual Multi-Armed Bandits for Link Adaptation in Cellular Networks}%
+    {NetAI '19, ACM SIGCOMM Workshop; DOI: 10.1145/3341216.3342212.}%
+    {Kontekstowe MAB wykorzystują wektor stanu kanału i informacje pomocnicze do uczenia prawdopodobieństwa sukcesu MCS; wybór parametru maksymalizującego throughput.}%
+    \textbf{Kluczowe wyniki:} szybsza zbieżność niż OLLA; +15\% / +25\% throughput przy częstych / rzadkich raportach kanału.\\
+    \textbf{Wnioski dla pracy:} baseline ML dla modułu D obok OLLA z Sionna SYS.
+
+\bibentry{%
+    L.~You \textit{et al.} (2026)}%
+    {From Simulation to Reality: Practical Deep Reinforcement Learning-based Link Adaptation for Cellular Networks}%
+    {arXiv:2603.00689.}%
+    {DRL-based LA (m.in. Dec-ILLA) uwzględnia opóźnienia ACK/NACK, retransmisje HARQ i latencję wykonania polityki DRL w symulacji zbliżonej do rzeczywistości.}%
+    \textbf{Kluczowe wyniki:} wyższy throughput niż klasyczne LA w scenariuszach z praktycznymi ograniczeniami feedbacku.\\
+    \textbf{Wnioski dla pracy:} argument za modelowaniem latencji decyzji MCS; inspiracja dla wariantu DRL w module D.
+
+\subsection{Grupa D: Narzędzia i platformy}
+
+\bibentry{NVIDIA}{Sionna PHY / SYS / RT / Research Kit}{Dokumentacja: \url{https://nvlabs.github.io/sionna/}~\cite{sionna-phy,sionna-sys,sionna-rt,sionna-rk}.}{%
+    Sionna 2.x (PyTorch) umożliwia symulację link-level (PHY), system-level (SYS) z modułami adaptacji łącza (OLLA) oraz ray tracing (RT). Research Kit łączy trening z wdrożeniem OAI.
+    \textbf{Wnioski dla pracy:} podstawowe środowisko eksperymentalne symulacji i treningu.}
+
+\bibentry{OAI Alliance}{OpenAirInterface 5G}{\url{https://openairinterface.org/}~\cite{oai}.}{%
+    Open-source implementacja stosu 4G/5G RAN i core; wsparcie dla pluginów PHY i testbedów SDR.
+    \textbf{Wnioski dla pracy:} platforma walidacji systemowej integracji ONNX.}
+
+\bibentry{NVIDIA Developer (2026)}{From Theory to Practice---Prototyping 6G With the NVIDIA Sionna Research Kit}{YouTube, 2026~\cite{youtube-sionna}.}{%
+    Prezentacja ścieżki od symulacji Sionna do prototypu 6G z TensorRT i OAI.
+    \textbf{Wnioski dla pracy:} uzasadnienie hardware-aware workflow.}
+
+\subsection{Grupa E: Standaryzacja}
+
+\bibentry{3GPP}{TR 38.843: Study on AI/ML for NR air interface}{Release 18--19, v19.0.0 (2025)~\cite{3gpp-38843}.}{%
+    Definiuje przypadki użycia AI/ML w interfejsie radiowym NR, metryki, modele treningu/wdrożenia oraz kierunek normatywny w Rel-19.
+    \textbf{Wnioski dla pracy:} uzasadnienie wyboru CSI feedback/prediction jako obszarów zgodnych ze standardem.}
+
+%==============================================================================
+\section{Metodyka i szczegóły realizacji}
+\label{sec:metodyka}
+%==============================================================================
+
+\subsection{Architektura systemu badawczego}
+
+Badania zorganizowane są warstwowo: każdy kolejny moduł rozszerza poprzedni, co zapewnia możliwość zatrzymania się na dowolnym etapie z kompletnym zestawem wyników.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.55cm and 0.6cm,
+    box/.style={draw, rounded corners, align=center, minimum width=2.6cm, minimum height=0.75cm, font=\small},
+    arr/.style={-{Stealth[length=2mm]}, thick}
+]
+    \node[box] (tx) {Nadajnik\\LDPC, QAM, OFDM};
+    \node[box, below=of tx] (ch) {Kanał 3GPP\\CDL/TDL, AWGN};
+    \node[box, below left=1.0cm and 0.2cm of ch] (cl) {Odbiornik\\klasyczny};
+    \node[box, below right=1.0cm and 0.2cm of ch] (nr) {Neural\\Receiver};
+    \node[box, below=1.2cm of ch] (llr) {LLR};
+    \node[box, below=of llr] (dec) {LDPC Decoder};
+    \node[box, below=of dec] (met) {Metryki\\BLER, latencja};
+    \node[box, right=2.8cm of nr] (csi) {CSI comp./pred.};
+    \node[box, below=of csi] (la) {Link Adaptation\\ILLA/OLLA/ML};
+    \node[box, below=of la] (sys) {Sionna SYS\\OLLA, HARQ};
+    \node[box, below=of sys] (oai) {OAI + ONNX};
+
+    \draw[arr] (tx) -- (ch);
+    \draw[arr] (ch) -- (cl);
+    \draw[arr] (ch) -- (nr);
+    \draw[arr] (cl) -- (llr);
+    \draw[arr] (nr) -- (llr);
+    \draw[arr] (llr) -- (dec);
+    \draw[arr] (dec) -- (met);
+    \draw[arr] (csi) -- (la);
+    \draw[arr] (la) -- (sys);
+    \draw[arr] (nr) -- (oai);
+    \draw[arr] (csi) -- (oai);
+\end{tikzpicture}
+\caption{Architektura systemu badawczego: symulacja PHY (Sionna), moduły cross-layer (CSI, LA) w SYS oraz wdrożenie ONNX w OAI.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Środowisko symulacyjne}
+
+\textbf{Sionna PHY} (wersja 2.x, PyTorch 2.9+, Python 3.11+)~\cite{sionna-phy}: symulacja link-level 5G NR PUSCH/PDSCH z komponentami 3GPP (LDPC, mappery, resource grid, kanały TDL/CDL).
+
+\textbf{Sionna SYS}~\cite{sionna-sys}: symulacja system-level multi-cell z \texttt{PHYAbstraction}, \texttt{OuterLoopLinkAdaptation} i \texttt{InnerLoopLinkAdaptation} (wbudowany scheduler PF pełni wyłącznie rolę komponentu symulatora, nie jest przedmiotem badań).
+
+\textbf{Konfiguracja referencyjna NR:}
+\begin{itemize}[leftmargin=*]
+    \item pasmo n78, SCS = 30~kHz $\Rightarrow$ $T_{\mathrm{slot}} = 1\,\mathrm{ms}/2^{\mu} = 0{,}5\,\mathrm{ms}$;
+    \item 24 / 51 / 106 PRB (zgodność z modelami referencyjnymi OAI/Sionna RK);
+    \item DMRS Type 1, konfiguracje MCS z tabel 3GPP;
+    \item kanały: CDL-A (trening), CDL-B/C/D/E (test generalizacji); prędkość UE 3--30~km/h (trening), 60--300~km/h (test);
+    \item SNR: $-5$ do $25$~dB (trening $0$--$20$~dB).
+\end{itemize}
+
+\textbf{Generacja danych:} dataset generowany \emph{on-the-fly} podczas treningu (losowe bity, realizacje kanału), co jest standardem w komunikacji bezprzewodowej i eliminuje przeuczenie do stałego zbioru trace'ów.
+
+\subsection{Moduł 0: Baseline klasyczny}
+
+Obowiązkowy punkt odniesienia (lekcje 00--06 w repozytorium \texttt{neural-receiver/}):
+\[
+\text{bits} \rightarrow \text{LDPC} \rightarrow \text{QAM} \rightarrow \text{OFDM grid} \rightarrow \text{kanał} \rightarrow \underbrace{\text{LS est.} \rightarrow \text{LMMSE eq.} \rightarrow \text{demap}}_{\text{klasyczny RX}} \rightarrow \text{LLR} \rightarrow \text{LDPC dec.} \rightarrow \text{bits}.
+\]
+Wynik: krzywe BLER/BER vs. SNR stanowią benchmark dla wszystkich wariantów ML (eksperyment E1).
+
+\subsection{Moduł A: Neural Receiver}
+
+\textbf{Wejście:} odebrany resource grid jako tensor $[\mathit{B}, 2, T, F]$ (kanały real/imag).
+
+\textbf{Wyjście:} LLR $[\mathit{B}, N_{\mathrm{bits}}]$; dekoder LDPC pozostaje klasyczny (modularność zgodna z literaturą~\cite{arxiv-2312-02601,arxiv-2409-02912}).
+
+\textbf{Architektury:}
+\begin{enumerate}[label=\alph*), leftmargin=*]
+    \item \textbf{CNN Small/Large} --- konwolucje 3$\times$3, ReLU, global average pooling, głowica LLR (implementacja bazowa: \texttt{NeuralReceiverCNN});
+    \item \textbf{Transformer} --- patch embedding siatki OFDM, self-attention (globalne zależności czasowo-częstotliwościowe);
+    \item \textbf{CGNN} (opcjonalnie zaawansowany) --- inspirowany~\cite{arxiv-2312-02601}.
+\end{enumerate}
+
+\textbf{Trening:} strata $\mathcal{L} = \mathrm{BCE}(\mathrm{bits}, \mathrm{LLR})$; optymalizator Adam; harmonogram SNR podczas treningu.
+
+\textbf{Ewaluacja:} BLER vs. SNR, przesunięcie SNR @ BLER=10\%, porównanie z modułem 0.
+
+\subsection{Moduł B: Kompresja CSI}
+
+Autoenkoder UE$\rightarrow$gNB: enkoder redukuje wymiar CSI do $M$ bitów/zespolonych symboli, dekoder rekonstruuje macierz kanału. Wariant transformerowy dla długich sekwencji~\cite{mathworks-csi}. Metryki: NMSE, SGCS~\cite{3gpp-38843}, współczynnik kompresji (bit overhead). Opcjonalnie MAMR/multi-rate~\cite{ieee-9417115}. Preprocessing UniversalNet~\cite{arxiv-2409-13494} jako technika poprawy generalizacji.
+
+\subsection{Moduł C: Predykcja CSI}
+
+Sieci rekurencyjne (LSTM/GRU) i Transformer przewidują CSI w horyzoncie $K$ slotów na podstawie historii $L$ pomiarów~\cite{arxiv-2510-12996}. Metryki: NMSE predykcji, błąd kątowy względem ground truth, wpływ prędkości UE (Doppler). Porównanie z \emph{bez predykcji} (przestarzałe CSI) w module D.
+
+\subsection{Moduł D: Adaptacja łącza (cross-layer)}
+
+\textbf{Baseline:} \texttt{InnerLoopLinkAdaptation} + \texttt{OuterLoopLinkAdaptation} w Sionna SYS ($\mathrm{BLER}_{\mathrm{target}} = 0{,}1$, $\delta_{\mathrm{up}}$ domyślne)~\cite{sionna-sys}.
+
+\textbf{Warianty ML:}
+\begin{itemize}[leftmargin=*]
+    \item predyktor MCS na podstawie skompresowanej lub przewidywanej CSI (moduły B/C);
+    \item kontekstowe MAB~\cite{acm-mcs};
+    \item uproszczony agent DRL (opcjonalnie) inspirowany~\cite{arxiv-2603-00689}.
+\end{itemize}
+
+\textbf{Optymalizacja międzywarstwowa:} jakość decyzji MCS zależy od dokładności CSI dostarczonej z warstwy PHY; eksperymenty mierzą wpływ błędu rekonstrukcji/predykcji na throughput i naruszenia SLA BLER.
+
+\subsection{Optymalizacja Hardware-Aware}
+
+Pipeline optymalizacji dla wybranych modeli z modułu A (priorytet) oraz B:
+\begin{enumerate}[label=\arabic*), leftmargin=*]
+    \item Eksport PyTorch $\rightarrow$ ONNX (wersja onnx 1.14 zgodnie z \texttt{neural\_rx});
+    \item Kompilacja TensorRT (FP32, FP16, INT8 PTQ i opcjonalnie QAT);
+    \item Pruning (niestrukturalny i strukturalny) + ewentualna destylacja do mniejszego CNN;
+    \item NAS z ograniczeniem latencji: przeszukiwanie głębokości/szerokości CNN przy $\mathrm{latency}_{p99} < \alpha \cdot T_{\mathrm{slot}}$ ($\alpha \approx 0{,}3$--$0{,}5$);
+    \item Optymalizacje runtime: pinned memory, CUDA streams, analiza batch size (1 vs. 2/4/8), pomiar latencji \emph{end-to-end} (preprocess + inferencja + postprocess), nie tylko samej sieci.
+\end{enumerate}
+
+\subsection{Integracja z OpenAirInterface przez ONNX}
+\label{sec:oai-onnx}
+
+Dwie ścieżki integracji ONNX z OAI --- obie w zakresie PHY i sprzężenia zwrotnego CSI, bez ingerencji w scheduler MAC:
+
+\subsubsection{Ścieżka A: Neural Receiver (główna)}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Trening:} Sionna PHY / notebook 07 / \texttt{neural-receiver}.
+    \item \textbf{Eksport:} ONNX $\rightarrow$ TensorRT engine (FP16 priorytet).
+    \item \textbf{Integracja OAI:} plugin \texttt{libreceiver\_neural\_rx.so} przez OAI Shared Library Loader~\cite{sionna-rk,neural-rx-repo}; aktywacja \texttt{GNB\_EXTRA\_OPTIONS}; konfiguracja 24~PRB (\texttt{gnb.sa.band78.24prbs.conf}).
+    \item \textbf{Punkt wstrzyknięcia:} po estymacji kanału / kompensacji, zamiast MMSE LLR --- wyjście neural RX jako LLR do LDPC.
+    \item \textbf{Pre/post-processing:} CUDA kernels (float16 wejście, int16 LLR); \texttt{MAX\_BLOCK\_LEN} zależny od liczby PRB --- wymaga re-eksportu modelu przy zmianie konfiguracji.
+    \item \textbf{Tryb awaryjny:} flaga runtime \texttt{use\_neural\_rx=0} $\rightarrow$ klasyczny MMSE (wzorzec z testbedu Ettus~\cite{ettus-nrx-testbed}).
+    \item \textbf{Walidacja:} porównanie BLER i latencji inferencji/s w logu gNB vs. symulacja Sionna.
+\end{itemize}
+
+\subsubsection{Ścieżka B: Kompresja CSI}
+
+Wzorzec~\cite{cheng-oai-csi-2024}: autoenkoder podzielony na enkoder (nrUE) i dekoder (gNB); inferencja ONNX Runtime C API na CPU ($\sim$18~MB). Mniejsze wymagania GPU; naturalny moduł cross-layer dla FDD massive MIMO (jeśli rozszerzony scope).
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+\textbf{Ścieżka} & \textbf{Punkt w OAI} & \textbf{Runtime} \\
+\midrule
+A -- Neural RX & PHY PUSCH, przed LDPC & TensorRT + CUDA \\
+B -- CSI AE & nrUE + gNB feedback & ONNX Runtime (CPU) \\
+\bottomrule
+\end{tabularx}
+\caption{Porównanie ścieżek integracji ONNX z OAI.}
+\end{table}
+
+\subsection{Plan eksperymentów E1--E10}
+
+\begin{longtable}{@{}p{1.2cm} p{3.2cm} p{4.5cm} p{3.2cm} p{2.8cm}@{}}
+\toprule
+\textbf{ID} & \textbf{Cel} & \textbf{Konfiguracja} & \textbf{Metryki} & \textbf{Baseline} \\
+\midrule
+\endhead
+E1 & Klasyczny RX & CDL-A, MCS stały, SNR sweep & BLER, BER vs. SNR & --- \\
+E2 & CNN neural RX & Jak E1 + trening BCE & BLER, BER & E1 \\
+E3 & Architektury & CNN S/L, Transformer S/L & BLER, params, FLOPs, latency & E1, E2 \\
+E4 & Generalizacja & Train CDL-A $\rightarrow$ test CDL-C, SNR$\pm$5~dB, 100~km/h & BLER, $\Delta$SNR@10\% & E1 \\
+E5 & Deployment & FP32/FP16/INT8, TensorRT & BLER, p50/p99 latency & E2 FP32 \\
+E6 & E2E pipeline & CUDA preprocess + TRT + copy & E2E latency & E5 \\
+E7 & CSI compression & Autoencoder, ratio 1/4--1/32 & NMSE, SGCS, bits & 2GPP type II \\
+E8 & CSI prediction & LSTM vs. Transformer, $K$ slotów & NMSE pred., goodput & bez predykcji \\
+E9 & Cross-layer LA & SYS + OLLA vs. ML MCS & throughput, BLER track, HARQ & OLLA \\
+E10 & OAI PoC & Ścieżka A lub B, 24 PRB & BLER, infer/s, p99 & Sionna + E1 \\
+\bottomrule
+\caption{Plan eksperymentów badawczych.}
+\end{longtable}
+
+\subsection{Metryki i budżet czasu rzeczywistego}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{PHY:} BER, BLER vs. SNR, $\Delta$SNR @ BLER = 10\%, goodput.
+    \item \textbf{CSI:} NMSE [dB], SGCS, narzut bitów sprzężenia zwrotnego.
+    \item \textbf{LA:} średni throughput, odchylenie od $\mathrm{BLER}_{\mathrm{target}}$, liczba retransmisji HARQ.
+    \item \textbf{Systemowe:} latencja p50/p99 [ms], inferencje/s, VRAM [MB], parametry, FLOPs.
+\end{itemize}
+
+Budżet referencyjny: dla SCS = 30~kHz, $T_{\mathrm{slot}} = 0{,}5$~ms; moduł neural RX powinien mieścić się w $\alpha \cdot T_{\mathrm{slot}}$, $\alpha \in [0{,}3,\,0{,}5]$, pozostawiając margines na pozostałe operacje PHY.
+
+\subsection{Macierz generalizacji}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Trening} & \textbf{Test} & \textbf{Moduł} & \textbf{Metryka główna} \\
+\midrule
+CDL-A, 0--20~dB, 3--30~km/h & CDL-A (seen) & A & BLER \\
+CDL-A & CDL-C (unseen channel) & A, B & BLER / NMSE \\
+CDL-A & $-5$, 25~dB (unseen SNR) & A & BLER \\
+3--30~km/h & 100--300~km/h & A, C & BLER / NMSE pred. \\
+Stały MCS & Zmienny MCS & A & BLER \\
+\bottomrule
+\end{tabular}
+\caption{Scenariusze badania generalizacji.}
+\end{table}
+
+\subsection{Powtarzalność}
+
+Stałe ziarna losowe (Python, PyTorch, NumPy); wersjonowanie konfiguracji eksperymentów (YAML/JSON w \texttt{experiments/}); zapis checkpointów i krzywych BLER; rozgrzewka GPU przed pomiarem latencji; raportowanie średniej i 95\% CI z $\geq 3$ niezależnych runów dla kluczowych punktów.
+
+%==============================================================================
+\section{Bibliografia}
+%==============================================================================
+
+\begin{thebibliography}{99}
+
+\bibitem{3gpp-38843}
+3GPP, \textit{TR 38.843: Study on Artificial Intelligence (AI)/Machine Learning (ML) for NR air interface}, Release 18--19, v19.0.0, 2025. [Online]. Dostępne: \url{https://www.3gpp.org/dynareport/38843.htm}
+
+\bibitem{ieee-comsoc-r18-ai}
+H.~Shi \textit{et al.}, ``An Overview of AI in 3GPP's RAN Release 18,'' \textit{IEEE ComSoc Technology News}, 2024. [Online]. Dostępne: \url{https://www.comsoc.org/publications/ctn/overview-ai-3gpps-ran-release-18-enhancing-next-generation-connectivity}
+
+\bibitem{oshea-hoydis-2017}
+T.~O'Shea, J.~Hoydis, ``An Introduction to Deep Learning for the Physical Layer,'' \textit{IEEE Trans. Cognitive Communications and Networking}, vol.~3, no.~4, pp.~563--575, 2017.
+
+\bibitem{arxiv-2312-02601}
+S.~Cammerer \textit{et al.}, ``A Neural Receiver for 5G NR Multi-user MIMO,'' \textit{IEEE Globecom Workshops}, 2023; arXiv:2312.02601. [Online]. Dostępne: \url{https://arxiv.org/abs/2312.02601}
+
+\bibitem{arxiv-2409-02912}
+R.~Wiesmayr \textit{et al.}, ``Design of a Standard-Compliant Real-Time Neural Receiver for 5G NR,'' arXiv:2409.02912, 2024. [Online]. Dostępne: \url{https://arxiv.org/abs/2409.02912}
+
+\bibitem{neural-rx-repo}
+NVlabs, \textit{neural\_rx}. [Online]. Dostępne: \url{https://github.com/NVlabs/neural_rx}
+
+\bibitem{wen-csinet-2018}
+C.-K.~Wen, W.-T.~Shih, S.~Jin, ``Deep Learning for Massive MIMO CSI Feedback,'' \textit{IEEE Wireless Communications Letters}, vol.~7, no.~5, pp.~748--751, 2018.
+
+\bibitem{arxiv-2206-14383}
+J.~Guo, C.-K.~Wen, S.~Jin, G.~Y.~Li, ``Overview of Deep Learning-based CSI Feedback in Massive MIMO Systems,'' arXiv:2206.14383, 2022. [Online]. Dostępne: \url{https://arxiv.org/abs/2206.14383}
+
+\bibitem{ieee-9417115}
+Y.~Wang, Y.~Zhang, J.~Sun, G.~Gui, T.~Ohtsuki, F.~Adachi, ``A Novel Compression CSI Feedback based on Deep Learning for FDD Massive MIMO Systems,'' \textit{Proc. IEEE WCNC}, 2021, DOI: 10.1109/WCNC49053.2021.9417115.
+
+\bibitem{arxiv-2409-13494}
+Z.~Liu, Y.~Ma, R.~Tafazolli, ``Generalizing Deep Learning-Based CSI Feedback in Massive MIMO via ID-Photo-Inspired Preprocessing,'' arXiv:2409.13494, 2024. [Online]. Dostępne: \url{https://arxiv.org/abs/2409.13494}
+
+\bibitem{arxiv-2510-12996}
+S.~Cheng \textit{et al.}, ``CSI-4CAST: A Hybrid Deep Learning Model for CSI Prediction with Comprehensive Robustness and Generalization Testing,'' arXiv:2510.12996, 2025. [Online]. Dostępne: \url{https://arxiv.org/abs/2510.12996}
+
+\bibitem{samsung-csi}
+Samsung Research, \textit{Deep Learning for CSI Feedback: One-Sided Model and Joint Multi-Module Learning Perspectives}. [Online]. Dostępne: \url{https://research.samsung.com/blog/Deep-Learning-for-CSI-Feedback-One-Sided-Model-and-Joint-Multi-Module-Learning-Perspectives}
+
+\bibitem{mathworks-csi}
+MathWorks, \textit{CSI Feedback Using Autoencoders and Transformers}. [Online]. Dostępne: \url{https://www.mathworks.com/help/5g/ug/csi-feedback-transformer-autoencoder.html}
+
+\bibitem{cheng-oai-csi-2024}
+H.~Cheng \textit{et al.}, ``Real-time AI-enabled CSI Feedback,'' \textit{Proc. IEEE WONS}, 2024.
+
+\bibitem{acm-mcs}
+V.~Saxena, J.~Jaldén, J.~E.~Gonzalez, M.~Bengtsson, H.~Tullberg, I.~Stoica, ``Contextual Multi-Armed Bandits for Link Adaptation in Cellular Networks,'' \textit{Proc. NetAI Workshop, ACM SIGCOMM}, 2019, DOI: 10.1145/3341216.3342212.
+
+\bibitem{arxiv-2603-00689}
+L.~You, N.~Zhou, G.~Pang, J.~Huang, Y.~Shao, L.~Fu, ``From Simulation to Reality: Practical Deep Reinforcement Learning-based Link Adaptation for Cellular Networks,'' arXiv:2603.00689, 2026. [Online]. Dostępne: \url{https://arxiv.org/abs/2603.00689}
+
+\bibitem{youtube-sionna}
+NVIDIA Developer, \textit{From Theory to Practice---Prototyping 6G With the NVIDIA Sionna Research Kit}, YouTube, 2026. [Online]. Dostępne: \url{https://www.youtube.com/watch?v=8OH8m5hyC90}
+
+\bibitem{sionna-phy}
+NVIDIA, \textit{Sionna PHY Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/phy/index.html}
+
+\bibitem{sionna-sys}
+NVIDIA, \textit{Sionna SYS Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/sys/index.html}
+
+\bibitem{sionna-rt}
+NVIDIA, \textit{Sionna RT Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/rt/index.html}
+
+\bibitem{sionna-rk}
+NVIDIA, \textit{Sionna Research Kit Documentation}. [Online]. Dostępne: \url{https://nvlabs.github.io/sionna/rk/index.html}
+
+\bibitem{oai}
+OpenAirInterface Software Alliance, \textit{OpenAirInterface 5G}. [Online]. Dostępne: \url{https://openairinterface.org/}
+
+\bibitem{ettus-nrx-testbed}
+Ettus Research, \textit{5G OAI Neural Receiver Testbed with USRP X410}. [Online]. Dostępne: \url{https://kb.ettus.com/5G_OAI_Neural_Receiver_Testbed_with_USRP_X410}
+
+\end{thebibliography}
+
+\end{document}
