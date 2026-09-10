@@ -82,21 +82,17 @@ Niniejszy dokument stanowi raport wstępny z badań i plan realizacji pracy magi
 \section{Motywacja i kontekst technologiczny}
 %==============================================================================
 
-Tradycyjne algorytmy przetwarzania sygnałów w sieciach komórkowych---estymacja kanału, equalizacja, demapowanie, zewnępętla adaptacji łącza (OLLA)---są dobrze zrozumiałe i znormalizowane, lecz napotykają ograniczenia w złożonych scenariuszach propagacyjnych charakterystycznych dla 5G NR i planowanych systemów 6G (wysokie częstotliwości, massive MIMO, mobilność, slicing). Równolegle sztuczna inteligencja przenika warstwę radiową nie tylko jako narzędzie badawcze, ale jako przedmiot standaryzacji.
+Motywacją podjęcia tematu jest chęć dogłębnego zrozumienia działania systemów telekomunikacyjnych 5G/6G oraz zagadnień sztucznej inteligencji stosowanej w warstwie radiowej w warunkach czasu rzeczywistego. Współczesny stos RAN obejmuje zarówno przetwarzanie w warstwie fizycznej (PHY) --- estymację kanału, equalizację, demapowanie, odbiór sygnału --- jak i mechanizmy adaptacji łącza (Link Adaptation), w tym dobór schematu modulacji i kodowania (MCS) na podstawie jakości kanału i sprzężenia zwrotnego HARQ. Oba obszary są ze sobą ściśle powiązane: jakość odbioru i dokładność informacji o stanie kanału (CSI) bezpośrednio wpływają na skuteczność decyzji MCS, co uzasadnia badania \emph{cross-layer} na pograniczu PHY i adaptacji łącza.
+
+Klasyczne algorytmy w tych obszarach są dobrze zrozumiane i znormalizowane, lecz w złożonych scenariuszach propagacyjnych --- wysokie częstotliwości, massive MIMO, mobilność, slicing --- coraz częściej rozważa się zastąpienie lub wsparcie tradycyjnych bloków modelami uczenia maszynowego. Kluczowym wyzwaniem nie jest sam fakt zastosowania sieci neuronowych, lecz ich \emph{wdrożenie w czasie rzeczywistym}: opóźnienia inferencji w łączu radiowym często muszą mieścić się w ułamkach milisekundy, co wymaga świadomego projektowania architektur (CNN, transformery, autoenkodery, sieci rekurencyjne) oraz optymalizacji sprzętowej --- kwantyzacji, pruning, destylacji i ewentualnie przeszukiwania przestrzeni architektur z ograniczeniami latencji (NAS).
 
 \subsection{Standaryzacja AI/ML w 3GPP}
 
-3GPP w ramach Release~18 rozpoczął studium \emph{Study on Artificial Intelligence (AI)/Machine Learning (ML) for NR air interface} (TR~38.843)~\cite{3gpp-38843}. Raport obejmuje ogólny framework AI/ML oraz przypadki użycia: kompresję CSI w domenie przestrzenno-częstotliwościowej (modele dwustronne), predykcję CSI w domenie czasu (modele po stronie UE), zarządzanie wiązkami (beam management) i pozycjonowanie. W Release~19 prace kontynuowane są w kierunku wymagań normatywnych, metryk monitorowania (SGCS, NMSE, throughput) oraz mechanizmów fallbacku~\cite{3gpp-38843,ieee-comsoc-r18-ai}.
-
-Kontekst standaryzacyjny uzasadnia badania nad kompresją CSI, predykcją kanału i odbiornikami neuronowymi nie jako modą technologiczną, lecz jako kierunkiem rozwoju interfejsu radiowego NR/6G.
+3GPP w ramach Release~18 rozpoczął studium \emph{Study on Artificial Intelligence (AI)/Machine Learning (ML) for NR air interface} (TR~38.843)~\cite{3gpp-38843}. Raport obejmuje ogólny framework AI/ML oraz przypadki użycia bezpośrednio istotne dla niniejszej pracy: kompresję CSI w domenie przestrzenno-częstotliwościowej, predykcję CSI w domenie czasu oraz --- pośrednio --- jakość informacji kanałowej wykorzystywanej przy doborze MCS. W Release~19 prace kontynuowane są w kierunku wymagań normatywnych, metryk monitorowania (SGCS, NMSE, throughput) oraz mechanizmów fallbacku~\cite{3gpp-38843,ieee-comsoc-r18-ai}. Kontekst standaryzacyjny potwierdza, że AI w PHY i w sprzężeniu zwrotnym CSI nie jest wyłącznie kierunkiem badawczym, lecz elementem rozwoju interfejsu radiowego NR/6G.
 
 \subsection{Walidacja systemowa w OpenAirInterface}
 
-Wyniki uzyskane w symulatorze link-level (Sionna PHY) i system-level (Sionna SYS) wymagają walidacji poza środowiskiem czysto symulacyjnym. OpenAirInterface (OAI)~\cite{oai} stanowi open-source implementację stosu 5G RAN, w której możliwe jest wstrzyknięcie modeli ML po eksporcie do ONNX --- m.in. neural receiver w warstwie PHY~\cite{neural-rx-repo,sionna-rk} oraz autoenkoder CSI~\cite{cheng-oai-csi-2024}. Taka ścieżka pozwala zmierzyć latencję inferencji i jakość odbioru w konfiguracji zbliżonej do rzeczywistego gNB, bez konieczności badania harmonogramowania MAC.
-
-\subsection{Motywacja badawcza}
-
-Motywacją pracy jest dogłębne zrozumienie kompromisu między \emph{jakością odbioru}, \emph{zdolnością generalizacji} modeli ML oraz \emph{opóźnieniem inferencji} w kontekście wymagań 5G NR. Literatura pokazuje, że odbiorniki neuronowe mogą poprawiać BLER względem klasycznych łańcuchów~\cite{arxiv-2312-02601,arxiv-2409-02912}, lecz wdrożenie real-time wymaga świadomego projektowania architektury i optymalizacji sprzętowej (TensorRT, kwantyzacja)~\cite{arxiv-2409-02912,neural-rx-repo}. Jednocześnie jakość decyzji MCS zależy od dokładności i aktualności CSI~\cite{wen-csinet-2018,arxiv-2206-14383}, co uzasadnia badania cross-layer łączące moduły PHY i adaptację łącza w Sionna SYS~\cite{sionna-sys}.
+Wyniki uzyskane w symulacji link-level (Sionna PHY) oraz system-level obejmującej adaptację łącza (Sionna SYS) wymagają walidacji poza środowiskiem czysto symulacyjnym. OpenAirInterface (OAI)~\cite{oai} stanowi open-source implementację stosu 5G RAN, w której możliwe jest wstrzyknięcie modeli ML po eksporcie do ONNX --- m.in. neural receiver w warstwie PHY~\cite{neural-rx-repo,sionna-rk} oraz autoenkoder CSI wspierający sprzężenie zwrotne kanału~\cite{cheng-oai-csi-2024}. Taka ścieżka pozwala zmierzyć latencję inferencji end-to-end i jakość odbioru w konfiguracji zbliżonej do rzeczywistego gNB, co stanowi naturalne uzupełnienie badań symulacyjnych nad PHY i Link Adaptation.
 
 %==============================================================================
 \section{Sformułowanie problemu badawczego}
@@ -475,28 +471,11 @@ E10 & OAI PoC & Ścieżka A lub B, 24 PRB & BLER, infer/s, p99 & Sionna + E1 \\
 
 Budżet referencyjny: dla SCS = 30~kHz, $T_{\mathrm{slot}} = 0{,}5$~ms; moduł neural RX powinien mieścić się w $\alpha \cdot T_{\mathrm{slot}}$, $\alpha \in [0{,}3,\,0{,}5]$, pozostawiając margines na pozostałe operacje PHY.
 
-\subsection{Macierz generalizacji}
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}llll@{}}
-\toprule
-\textbf{Trening} & \textbf{Test} & \textbf{Moduł} & \textbf{Metryka główna} \\
-\midrule
-CDL-A, 0--20~dB, 3--30~km/h & CDL-A (seen) & A & BLER \\
-CDL-A & CDL-C (unseen channel) & A, B & BLER / NMSE \\
-CDL-A & $-5$, 25~dB (unseen SNR) & A & BLER \\
-3--30~km/h & 100--300~km/h & A, C & BLER / NMSE pred. \\
-Stały MCS & Zmienny MCS & A & BLER \\
-\bottomrule
-\end{tabular}
-\caption{Scenariusze badania generalizacji.}
-\end{table}
-
 \subsection{Powtarzalność}
 
 Stałe ziarna losowe (Python, PyTorch, NumPy); wersjonowanie konfiguracji eksperymentów (YAML/JSON w \texttt{experiments/}); zapis checkpointów i krzywych BLER; rozgrzewka GPU przed pomiarem latencji; raportowanie średniej i 95\% CI z $\geq 3$ niezależnych runów dla kluczowych punktów.
+
+
 
 %==============================================================================
 \section{Bibliografia}
